@@ -1,0 +1,33 @@
+stages:
+  - build-docs
+  - release
+
+
+build-docs:
+  stage: build-docs
+  before_script:
+    - export PACKAGE_HASH=$(md5 -r package.json | cut -d ' ' -f1)
+    - export DEPS_CACHE=/Users/gitlab.runner/gitlab-ci-cache/node_modules_${CI_PROJECT_NAME}_${PACKAGE_HASH}
+    - if [ -f ${DEPS_CACHE} ];
+      then
+        tar zxf ${DEPS_CACHE};
+      else
+        npm install --quiet;
+        tar zcf - ./node_modules > ${DEPS_CACHE};
+      fi
+  script:
+    - npm run doc:prod
+    - cd docs/_book
+    - rsync -av . gitlab.runner@10.136.225.86:/servers/file-server/book/drc-starter-kit
+  only:
+    - master
+
+release:
+  stage: release
+  script:
+    - export BUILD_VERSION=$(node -e "console.log(require('./package.json').version)")
+    - export ZIP_NAME=drc-starter-kit_${BUILD_VERSION}.zip
+    - git archive -o ${ZIP_NAME} HEAD
+    - scp ${ZIP_NAME} gitlab.runner@10.136.225.86:/servers/file-server/release/drc-starter-kit/
+  only:
+    - master
